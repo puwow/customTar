@@ -457,7 +457,6 @@ class OperPanel( fpb.FoldPanelBar ):
             excludes.append((data,value))
         return excludes
 
-
     def ReadShe( self, key ):
         she = shelve.open( SHE_DB, flag="r" )
         projects = []
@@ -543,6 +542,24 @@ class OperPanel( fpb.FoldPanelBar ):
             temp_files.append( item )
         tarPanel.ShowData( temp_files )
 
+class MyFileDropTarget( wx.FileDropTarget ):
+    def __init__( self, window ):
+        wx.FileDropTarget.__init__( self )
+        self.window = window
+    def OnDropFiles( self, x, y, filenames ):
+        tarPanel = wx.GetApp().GetTopWindow().GetTarPanel()
+        operPanel = wx.GetApp().GetTopWindow().GetOperPanel()
+        path = operPanel.ctrl_path.getControl("combobox").GetValue()
+        if path == '':
+            wx.MessageBox(u'需要先设定项目路径!')
+            return
+        files=[]
+        for filename in filenames:
+            with open( filename ) as fp:
+                files = files + list(set([ x.replace("\\","/").replace("\n","") for x in fp.readlines() ]))
+        tarPanel.LoadDataFiles( path, files, filters=True )
+        tarPanel.EnableAll(False)
+        return True
 class TarPanel( wx.Panel ):
     def __init__( self, parent, id=wx.ID_ANY, name='tarPanel' ):
         wx.Panel.__init__( self, parent=parent, id=id, name=name )
@@ -553,6 +570,8 @@ class TarPanel( wx.Panel ):
                 self.imageList.Add( bmp )
 
         self.ctrl_list = ctrl_list = wx.ListCtrl( self, id=wx.ID_ANY, style=wx.LC_REPORT|wx.LC_HRULES|wx.LC_VRULES )
+        dt = MyFileDropTarget( self.ctrl_list )
+        self.ctrl_list.SetDropTarget( dt )
         ctrl_list.AssignImageList( self.imageList, wx.IMAGE_LIST_SMALL )
         ctrl_list.InsertColumn( 0, u'编号', format=wx.LIST_MASK_TEXT|wx.LIST_FORMAT_CENTER|wx.LIST_MASK_IMAGE, width=80 )
         ctrl_list.InsertColumn( 1, u'文件名', width=280 )
@@ -737,11 +756,15 @@ class TarPanel( wx.Panel ):
             self.ctrl_list.DeleteItem( dd )
             self.ctrl_list.Refresh()
         if self.ctrl_list.GetItemCount() == 0:
+            operPanel = wx.GetApp().GetTopWindow().FindWindowById(wx.GetApp().GetTopWindow().GetPanelById())
             self.EnableAll()
+            operPanel.LoadData()
     def OnClearFile( self, event ):
         #清空文件
+        operPanel = wx.GetApp().GetTopWindow().FindWindowById(wx.GetApp().GetTopWindow().GetPanelById())
         self.ctrl_list.DeleteAllItems()
         self.EnableAll()
+        operPanel.LoadData()
 
 
 class DemoFrame( wx.Frame ):
@@ -789,6 +812,10 @@ class DemoFrame( wx.Frame ):
         self.InitMenu()
     def GetCustomTar( self ):
         return self.tar
+    def GetOperPanel( self ):
+        return self.rPanel
+    def GetTarPanel( self ):
+        return self.cPanel
     def GetPanelById( self ):
         return self.rPanel.GetId()
     def InitMenu( self ):
